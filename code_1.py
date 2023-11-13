@@ -87,7 +87,9 @@ def find_best_bank(selected_duration, bank_data):
 
 def calculate_remaining_amount(principal, interest_rate, time):
     # Compound interest formula
-    remaining_amount = principal * (1 + interest_rate / 100) ** time
+    remaining_amount = 0
+    for i in range(1,time+1):
+        remaining_amount += principal * ((1 + interest_rate / 100) ** time)
     return remaining_amount
 
 def calculate_savings_plan(goal_amount, income, expenses, selected_duration, bank_data):
