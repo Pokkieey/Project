@@ -55,6 +55,14 @@ bank_data = {
         "Loan without collateral": 20,
     },
 }
+def get_float_input(prompt):
+    while True:
+        try:
+            value = float(input(prompt))
+            return value
+        except ValueError:
+            print("Invalid input. Please enter a valid numerical value.")
+            
 def calculate_total_loan_amount(loan_amount, interest_rate):
     return loan_amount * (1 + interest_rate / 100)
 
@@ -128,9 +136,9 @@ if __name__ == "__main__":
         option_choice = input("Enter the number corresponding to your choice: ")
 
         if option_choice == '1':
-            goal_amount = float(input("What is your savings goal? "))
-            income = float(input("Enter your monthly income: "))
-            expenses = float(input("Enter your monthly expenses: "))
+            goal_amount = get_float_input("What is your savings goal? ")
+            income = get_float_input("Enter your monthly income: ")
+            expenses = get_float_input("Enter your monthly expenses: ")
 
             print("\nSelect a saving duration:")
             print("1. 3 months")
@@ -152,7 +160,7 @@ if __name__ == "__main__":
         elif option_choice == '2':
             loan_amount = float(input("Enter the desired loan amount: "))
             collateral = input("Do you have collateral? (yes/no): ").lower() == "yes"
-
+            collateral = collateral_input == "yes" or collateral_input == "y"
             cheapest_bank, cheapest_total_amount = find_cheapest_bank(loan_amount, collateral, bank_data)
 
             print(f"The cheapest bank for a loan of {loan_amount} with {'collateral' if collateral else 'no collateral'} is {cheapest_bank} with a total amount of {cheapest_total_amount:.2f}.")
