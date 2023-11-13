@@ -92,6 +92,8 @@ def calculate_remaining_amount(principal, interest_rate, time):
         remaining_amount += principal * ((1 + interest_rate / 100) ** time)
     return remaining_amount
 
+# ... (previous code remains unchanged) ...
+
 def calculate_savings_plan(goal_amount, income, expenses, selected_duration, bank_data):
     remaining_amount = income - expenses
 
@@ -106,7 +108,7 @@ def calculate_savings_plan(goal_amount, income, expenses, selected_duration, ban
         return None  # Return None if there's an issue
 
     remaining_amount_after_duration = calculate_remaining_amount(remaining_amount, interest_rate, int(selected_duration.split()[0]))
-   
+
     monthly_savings = goal_amount / int(selected_duration.split()[0])
 
     result_text = (
@@ -130,27 +132,21 @@ if __name__ == "__main__":
             income = float(input("Enter your monthly income: "))
             expenses = float(input("Enter your monthly expenses: "))
 
-            print("\nWould you like to cash out during the time?")
-            cash_out_choice = input("Enter 'y' for yes or 'n' for no: ").lower()
+            print("\nSelect a saving duration:")
+            print("1. 3 months")
+            print("2. 6 months")
+            print("3. 12 months")
+            print("4. 24 months")
 
-            if cash_out_choice == 'y':
-                result = calculate_savings_plan(goal_amount, income, expenses, None, bank_data, cash_out=True)
-            elif cash_out_choice == 'n':
-                print("\nSelect a saving duration:")
-                print("1. 3 months")
-                print("2. 6 months")
-                print("3. 12 months")
-                print("4. 24 months")
+            duration_choice = input("Enter the number corresponding to your choice: ")
+            duration_mapping = {'1': '3 months', '2': '6 months', '3': '12 months', '4': '24 months'}
+            selected_duration = duration_mapping.get(duration_choice)
 
-                duration_choice = input("Enter the number corresponding to your choice: ")
-                duration_mapping = {'1': '3 months', '2': '6 months', '3': '12 months', '4': '24 months'}
-                selected_duration = duration_mapping.get(duration_choice)
+            if not selected_duration:
+                print("Invalid choice. Please enter a valid number.")
+                continue
 
-                if not selected_duration:
-                    print("Invalid choice. Please enter a valid number.")
-                    continue
-
-                result = calculate_savings_plan(goal_amount, income, expenses, selected_duration, bank_data)
+            result = calculate_savings_plan(goal_amount, income, expenses, selected_duration, bank_data)
             print(result)
 
         elif option_choice == '2':
