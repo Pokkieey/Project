@@ -34,7 +34,24 @@ function exportExcel(rows){if(!window.XLSX){alert('โหลดระบบ Exce
 // --- Cash register: Bangkok business date, opening float, sale, transfer and owner collection ---
 function todayBangkok(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
 const round2=n=>Math.round((Number(n)+Number.EPSILON)*100)/100;
-async function getCashDay(){const a=await api('cash_days?business_date=eq.'+todayBangkok()+'&select=*');return a[0]||null}
+async function getCashDay() {
+    const sessions = await api(
+        'cash_days?select=*&order=opened_at.desc,id.desc&limit=100'
+    );
+
+    // Continue any session that has not been closed.
+    const active = sessions.find(s => !s.closed_at);
+    if (active) return active;
+
+    // Continue the last closed session until Extra is separated.
+    const latest = sessions[0];
+    if (latest && !latest.extra_confirmed_at) {
+        return latest;
+    }
+
+    // Otherwise allow a new session, even on the same day.
+    return null;
+}
 async function cashState(){const day=await getCashDay();if(!day)return {day:null,moves:[],register:0,extra:0,sales:0,transferred:0,collected:0};const moves=await api('cash_movements?cash_day_id=eq.'+day.id+'&select=*&order=created_at.desc');let register=Number(day.opening_float),extra=0,sales=0,transferred=0,collected=0;for(const m of moves){const a=Number(m.amount);if(m.kind==='sale'){register+=a;sales+=a}else if(m.kind==='transfer_to_extra'){register-=a;extra+=a;transferred+=a}else if(m.kind==='owner_collection'){extra-=a;collected+=a}else if(m.kind==='adjustment')register+=a}return {day,moves,register:round2(register),extra:round2(extra),sales,transferred,collected}}
 function payment(id){stopCamera();const x=A.find(v=>Number(v.id)===id);if(!x)return checkout();M.innerHTML='<h1>รับชำระเงิน</h1><div class="panel"><div class="muted">'+esc(x.therapist_name)+' · '+esc(x.service)+' · '+x.duration_minutes+' นาที</div><div class="bill-total">'+cash(x.original_price)+'</div><h2>เลือกวิธีชำระเงิน</h2><div class="pay-options"><button class="pay-option" id="chooseQR"><span class="symbol">▦</span><b>โอนเงิน / QR</b><p>แสดง QR แล้วถ่ายสลิปผ่านกล้อง Tablet</p></button><button class="pay-option" id="chooseCash"><span class="symbol">฿</span><b>เงินสด</b><p>รับเงิน คำนวณเงินทอน และบันทึกเข้าลิ้นชัก</p></button></div></div><div class="toolbar"><button class="btn" id="back">← กลับรายการ</button></div>';document.getElementById('chooseQR').onclick=()=>promptpayPayment(id);document.getElementById('chooseCash').onclick=()=>cashPayment(id);document.getElementById('back').onclick=checkout}
 async function cashPayment(id){const x=A.find(v=>Number(v.id)===id);if(!x)return checkout();try{const st=await cashState();if(!st.day){M.innerHTML='<h1>ยังไม่เปิดลิ้นชักเงินสดวันนี้</h1><div class="panel warn">เจ้าของร้านต้องกำหนดเงินทอนเริ่มต้นก่อนรับเงินสด เช่น ฿2,000</div><button class="btn" id="back">← กลับ</button>';document.getElementById('back').onclick=()=>payment(id);return}if(st.day.closed_at){M.innerHTML='<h1>ปิดยอดเงินสดวันนี้แล้ว</h1><p>ติดต่อเจ้าของร้านเพื่อจัดการลิ้นชัก</p><button class="btn" id="back">← กลับ</button>';document.getElementById('back').onclick=()=>payment(id);return}
