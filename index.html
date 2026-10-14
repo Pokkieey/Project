@@ -1,79 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>MANAWA POS</title>
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MANAWA POS</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-    <div class="app">
-
-        <!-- HEADER -->
-        <header class="top">
-
-            <!-- SHOP NAME -->
-            <div>
-                <div class="brand">MANAWA</div>
-                <div class="muted">MASSAGE & WELLNESS</div>
-            </div>
-
-            <!-- HEADER BUTTONS -->
-            <div class="actions">
-
-                <!-- STAFF: OPEN / CLOSE SHOP -->
-                <button
-                    id="shopCash"
-                    class="btn"
-                    type="button"
-                >
-                    🏪 เปิดร้าน / ปิดร้าน
-                </button>
-
-                <!-- OWNER DASHBOARD -->
-                <button
-                    id="ownerBtn"
-                    class="btn"
-                    type="button"
-                >
-                    สำหรับเจ้าของ
-                </button>
-
-                <!-- CHECKOUT -->
-                <button
-                    id="payBtn"
-                    class="btn dark"
-                    type="button"
-                >
-                    ชำระเงิน
-                    <span id="count"></span>
-                </button>
-
-            </div>
-
-        </header>
-
-        <!-- MAIN POS CONTENT -->
-        <main id="main">
-
-            <div class="panel loading">
-                กำลังโหลด…
-            </div>
-
-        </main>
-
-    </div>
-
-    <!-- MAIN APPLICATION -->
-    <script src="app.js"></script>
-
-    <!-- EXCEL EXPORT LIBRARY -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
+  <div class="app">
+    <header class="top">
+      <div>
+        <div class="brand">MANAWA</div>
+        <div class="muted">MASSAGE & WELLNESS</div>
+      </div>
+      <div class="actions">
+        <button id="shopCash" class="btn" type="button">🏪 เปิดร้าน / ปิดร้าน</button>
+        <button id="extraCash" class="btn" type="button">💰 Extra Cash</button>
+        <button id="ownerBtn" class="btn" type="button">สำหรับเจ้าของ</button>
+        <button id="payBtn" class="btn dark" type="button">ชำระเงิน <span id="count"></span></button>
+      </div>
+    </header>
+    <main id="main"><div class="panel loading">กำลังโหลด…</div></main>
+  </div>
+  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </body>
 </html>

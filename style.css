@@ -7,3 +7,11 @@
 
 /* Staff-facing open/close shop action */
 .shop-toolbar{display:flex;justify-content:flex-end;margin:8px 0 20px}.shop-toolbar .btn{min-height:48px}
+
+/* Extra Cash overview */
+.session-row{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #e8e2d9;padding:15px 0;flex-wrap:wrap}
+.session-row:last-child{border-bottom:0}
+.session-right{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.actions{flex-wrap:wrap}
+.avatar{width:72px!important;height:72px!important;min-width:72px;min-height:72px;overflow:hidden;border-radius:50%}
+.avatar img{display:block;width:100%!important;height:100%!important;object-fit:cover;border-radius:50%}
