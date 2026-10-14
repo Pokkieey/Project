@@ -26,7 +26,320 @@ document.getElementById('file').onchange=e=>{let f=e.target.files?.[0];if(f)setS
 function setSlip(b){stopCamera();if(slipPreview)URL.revokeObjectURL(slipPreview);slipBlob=b;slipPreview=URL.createObjectURL(b);const p=document.getElementById('preview');p.src=slipPreview;p.classList.remove('hidden');document.getElementById('video').classList.add('hidden');document.getElementById('snap').classList.add('hidden');document.getElementById('camera').classList.add('hidden');document.getElementById('retake').classList.remove('hidden');document.getElementById('slipstatus').textContent='✓ ถ่ายสลิปแล้ว';confirm.disabled=false}
 confirm.onclick=async()=>{if(!slipBlob)return;confirm.disabled=true;confirm.textContent='กำลังบันทึก…';try{const ext=slipBlob.type==='image/png'?'png':'jpg',path='receipts/'+x.id+'-'+Date.now()+'.'+ext;let res=await fetch(U+'/storage/v1/object/payment-slips/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':slipBlob.type||'image/jpeg','x-upsert':'false'},body:slipBlob});if(!res.ok)throw Error('อัปโหลดสลิปไม่สำเร็จ: '+await res.text());const total=Number(x.original_price)-discount,rate=Number(x.therapist_rate)||.30;await api('transactions?id=eq.'+x.id,{method:'PATCH',body:JSON.stringify({status:'paid',payment_method:'promptpay',discount_type:type,discount_amount:discount,final_price:total,therapist_pay:Math.round(total*rate*100)/100,slip_path:path,slip_uploaded_at:new Date().toISOString(),paid_at:new Date().toISOString()})});stopCamera();M.innerHTML='<div class="panel loading" style="text-align:center"><h1>✓ บันทึกเรียบร้อย</h1><p>รับสลิปแล้ว · '+cash(total)+'</p><p class="muted">เจ้าของร้านสามารถตรวจสอบสลิปย้อนหลังได้</p><button class="btn primary" id="again">กลับหน้า POS</button></div>';document.getElementById('again').onclick=load;[T,A]=await Promise.all([api('therapists?active=eq.true&select=*&order=id'),api('transactions?status=eq.active&select=*&order=created_at.desc')]);document.getElementById('count').textContent=A.length?'('+A.length+')':''}catch(e){document.getElementById('slipstatus').textContent=e.message;confirm.disabled=false;confirm.textContent='ลองบันทึกอีกครั้ง'}}}
 function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}}
-async function owner(){stopCamera();if(!ownerOK){const pin=prompt('PIN เจ้าของร้าน');if(pin!=='1234')return;ownerOK=true}try{const rows=await api('transactions?status=eq.paid&select=*&order=paid_at.desc');const revenue=rows.reduce((s,x)=>s+Number(x.final_price||0),0),owed=rows.reduce((s,x)=>s+Number(x.therapist_pay||0),0);const freq={};rows.forEach(x=>freq[x.service]=(freq[x.service]||0)+1);const best=Object.keys(freq).sort((a,b)=>freq[b]-freq[a])[0]||'-';M.innerHTML='<h1>Owner Dashboard</h1><div class="grid"><div class="panel">ยอดขาย<div class="price">'+cash(revenue)+'</div></div><div class="panel">งานสำเร็จ<div class="price">'+rows.length+'</div></div><div class="panel">ค่าหมอ<div class="price">'+cash(owed)+'</div></div><div class="panel">บริการขายดี<div class="name">'+esc(best)+'</div></div></div><div class="toolbar"><button class="btn primary" id="cashRegister">จัดการเงินสด / ลิ้นชัก</button><button class="btn" id="staff">จัดการหมอ</button><button class="btn primary" id="excel">Export Excel</button><button class="btn" id="back">← กลับ POS</button></div><h2>ประวัติการชำระเงินและสลิป</h2><div class="panel">'+(rows.length?rows.map(x=>'<div class="row"><div><b>'+esc(x.therapist_name)+'</b><div class="muted">'+date(x.paid_at)+' · '+esc(x.service)+'</div></div><div><b>'+cash(x.final_price)+'</b> '+(x.slip_path?'<button class="btn slip" data-id="'+x.id+'">ดูสลิป</button>':'<span class="muted">ไม่มีสลิป</span>')+'</div></div>').join(''):'ยังไม่มีรายการ')+'</div>';document.getElementById('back').onclick=home;document.getElementById('cashRegister').onclick=()=>extraDashboard(true);document.getElementById('staff').onclick=manageStaff;document.getElementById('excel').onclick=()=>exportExcel(rows);document.querySelectorAll('.slip').forEach(b=>b.onclick=async()=>{const x=rows.find(r=>r.id===+b.dataset.id);try{const r=await fetch(U+'/storage/v1/object/sign/payment-slips/'+x.slip_path,{method:'POST',headers:H,body:JSON.stringify({expiresIn:120})});if(!r.ok)throw Error(await r.text());const j=await r.json();window.open(U+'/storage/v1'+j.signedURL,'_blank')}catch(e){alert('เปิดสลิปไม่ได้: '+e.message)}})}catch(e){err(e)}}
+async function owner() {
+    stopCamera();
+
+    // Owner PIN
+    if (!ownerOK) {
+        const pin = prompt('PIN เจ้าของร้าน');
+
+        if (pin !== '1234') return;
+
+        ownerOK = true;
+    }
+
+    try {
+        // Get completed transactions
+        const rows = await api(
+            'transactions?status=eq.paid&select=*&order=paid_at.desc'
+        );
+
+        // Calculate dashboard totals
+        const revenue = rows.reduce(
+            (sum, x) => sum + Number(x.final_price || 0),
+            0
+        );
+
+        const owed = rows.reduce(
+            (sum, x) => sum + Number(x.therapist_pay || 0),
+            0
+        );
+
+        const freq = {};
+
+        rows.forEach(x => {
+            freq[x.service] = (freq[x.service] || 0) + 1;
+        });
+
+        const best = Object.keys(freq)
+            .sort((a, b) => freq[b] - freq[a])[0] || '-';
+
+        // Payment method summary
+        const cashRows = rows.filter(
+            x => x.payment_method === 'cash'
+        );
+
+        const qrRows = rows.filter(
+            x => x.payment_method === 'promptpay'
+        );
+
+        const cashRevenue = cashRows.reduce(
+            (sum, x) => sum + Number(x.final_price || 0),
+            0
+        );
+
+        const qrRevenue = qrRows.reduce(
+            (sum, x) => sum + Number(x.final_price || 0),
+            0
+        );
+
+        // Payment method label
+        function paymentBadge(method) {
+            if (method === 'cash') {
+                return `
+                    <span style="
+                        display:inline-block;
+                        background:#e4f3e7;
+                        color:#246c39;
+                        padding:6px 12px;
+                        border-radius:20px;
+                        font-size:13px;
+                        font-weight:700;
+                    ">
+                        💵 เงินสด
+                    </span>
+                `;
+            }
+
+            if (method === 'promptpay') {
+                return `
+                    <span style="
+                        display:inline-block;
+                        background:#e5efff;
+                        color:#2455a4;
+                        padding:6px 12px;
+                        border-radius:20px;
+                        font-size:13px;
+                        font-weight:700;
+                    ">
+                        📱 PromptPay
+                    </span>
+                `;
+            }
+
+            return `
+                <span class="muted">
+                    ไม่ระบุวิธีชำระ
+                </span>
+            `;
+        }
+
+        // Build dashboard
+        M.innerHTML = `
+            <h1>Owner Dashboard</h1>
+
+            <div class="grid">
+
+                <div class="panel">
+                    ยอดขายทั้งหมด
+                    <div class="price">
+                        ${cash(revenue)}
+                    </div>
+                </div>
+
+                <div class="panel">
+                    งานสำเร็จ
+                    <div class="price">
+                        ${rows.length}
+                    </div>
+                </div>
+
+                <div class="panel">
+                    ค่าหมอ
+                    <div class="price">
+                        ${cash(owed)}
+                    </div>
+                </div>
+
+                <div class="panel">
+                    บริการขายดี
+                    <div class="name">
+                        ${esc(best)}
+                    </div>
+                </div>
+
+            </div>
+
+            <h2>สรุปวิธีชำระเงิน</h2>
+
+            <div class="grid">
+
+                <div class="panel">
+                    <div>💵 ยอดชำระเงินสด</div>
+
+                    <div class="price">
+                        ${cash(cashRevenue)}
+                    </div>
+
+                    <div class="muted">
+                        ${cashRows.length} รายการ
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div>📱 ยอดชำระ PromptPay</div>
+
+                    <div class="price">
+                        ${cash(qrRevenue)}
+                    </div>
+
+                    <div class="muted">
+                        ${qrRows.length} รายการ
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="toolbar">
+
+                <button class="btn primary" id="cashRegister">
+                    จัดการเงินสด / ลิ้นชัก
+                </button>
+
+                <button class="btn" id="staff">
+                    จัดการหมอ
+                </button>
+
+                <button class="btn primary" id="excel">
+                    Export Excel
+                </button>
+
+                <button class="btn" id="back">
+                    ← กลับ POS
+                </button>
+
+            </div>
+
+            <h2>ประวัติการชำระเงินและสลิป</h2>
+
+            <div class="panel">
+
+                ${
+                    rows.length
+                    ? rows.map(x => `
+
+                        <div class="row">
+
+                            <div>
+
+                                <b>
+                                    ${esc(x.therapist_name)}
+                                </b>
+
+                                <div class="muted">
+                                    ${date(x.paid_at)}
+                                    ·
+                                    ${esc(x.service)}
+                                </div>
+
+                                <div style="margin-top:8px;">
+                                    ${paymentBadge(x.payment_method)}
+                                </div>
+
+                            </div>
+
+                            <div style="text-align:right;">
+
+                                <b>
+                                    ${cash(x.final_price)}
+                                </b>
+
+                                <div style="margin-top:8px;">
+
+                                    ${
+                                        x.slip_path
+                                        ? `
+                                            <button
+                                                class="btn slip"
+                                                data-id="${x.id}"
+                                            >
+                                                ดูสลิป
+                                            </button>
+                                        `
+                                        : (
+                                            x.payment_method === 'cash'
+                                            ? '<span class="muted">รับเงินสด</span>'
+                                            : '<span class="muted">ไม่มีสลิป</span>'
+                                        )
+                                    }
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    `).join('')
+                    : '<p class="muted">ยังไม่มีรายการ</p>'
+                }
+
+            </div>
+        `;
+
+        // Navigation buttons
+        document.getElementById('back').onclick = home;
+
+        document.getElementById('cashRegister').onclick = () => {
+            extraDashboard(true);
+        };
+
+        document.getElementById('staff').onclick = manageStaff;
+
+        document.getElementById('excel').onclick = () => {
+            exportExcel(rows);
+        };
+
+        // View payment slips
+        document.querySelectorAll('.slip').forEach(button => {
+
+            button.onclick = async () => {
+
+                const transaction = rows.find(
+                    r => r.id === Number(button.dataset.id)
+                );
+
+                if (!transaction || !transaction.slip_path) {
+                    alert('ไม่พบสลิป');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(
+                        U +
+                        '/storage/v1/object/sign/payment-slips/' +
+                        transaction.slip_path,
+                        {
+                            method: 'POST',
+                            headers: H,
+                            body: JSON.stringify({
+                                expiresIn: 120
+                            })
+                        }
+                    );
+
+                    if (!response.ok) {
+                        throw Error(await response.text());
+                    }
+
+                    const result = await response.json();
+
+                    window.open(
+                        U + '/storage/v1' + result.signedURL,
+                        '_blank'
+                    );
+
+                } catch (e) {
+                    alert('เปิดสลิปไม่ได้: ' + e.message);
+                }
+
+            };
+
+        });
+
+    } catch (e) {
+        err(e);
+    }
+}
 function manageStaff(){M.innerHTML='<h1>จัดการหมอนวด</h1><div class="panel">'+T.map(t=>'<div class="row"><div><b>'+esc(t.name)+'</b><div class="muted">'+(t.is_temporary?'หมอวิ่ง 45%':'หมอประจำ 30%')+'</div></div><button class="btn edit" data-id="'+t.id+'">แก้ไข</button></div>').join('')+'</div><div class="toolbar"><button class="btn" id="back">← Dashboard</button></div>';document.getElementById('back').onclick=owner;document.querySelectorAll('.edit').forEach(b=>b.onclick=()=>editStaff(+b.dataset.id))}
 function editStaff(id){const t=T.find(x=>x.id===id);M.innerHTML='<h1>แก้ไขหมอนวด</h1><div class="panel"><label>ชื่อ</label><input class="input" id="name" value="'+esc(t.name)+'"><label>ประเภทหมอ</label><select class="input" id="kind"><option value="permanent">หมอประจำ (30%)</option><option value="runner">หมอวิ่ง (45%)</option></select><label>รูปหมอนวด</label><input class="input" id="photo" type="file" accept="image/jpeg,image/png,image/webp"><div class="toolbar"><button class="btn primary" id="save">บันทึก</button><button class="btn" id="back">ยกเลิก</button></div></div>';document.getElementById('kind').value=t.is_temporary?'runner':'permanent';document.getElementById('back').onclick=manageStaff;document.getElementById('save').onclick=async()=>{try{let photo=t.photo_url;const f=document.getElementById('photo').files[0];if(f){if(f.size>5e6)throw Error('รูปต้องไม่เกิน 5MB');let path='therapist-'+id+'-'+Date.now()+'.'+(f.type==='image/png'?'png':f.type==='image/webp'?'webp':'jpg');let r=await fetch(U+'/storage/v1/object/therapist-photos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':f.type},body:f});if(!r.ok)throw Error(await r.text());photo=U+'/storage/v1/object/public/therapist-photos/'+path}const runner=document.getElementById('kind').value==='runner';await api('therapists?id=eq.'+id,{method:'PATCH',body:JSON.stringify({name:document.getElementById('name').value.trim(),is_temporary:runner,commission_rate:runner?.45:.30,photo_url:photo})});await load();await owner()}catch(e){alert('บันทึกไม่สำเร็จ: '+e.message)}}}
 function exportExcel(rows){if(!window.XLSX){alert('โหลดระบบ Excel ไม่ได้ กรุณาต่ออินเทอร์เน็ต');return}const w=XLSX.utils.book_new(),summary=[{รายการ:'ยอดขาย',ค่า:rows.reduce((s,x)=>s+Number(x.final_price||0),0)},{รายการ:'งานสำเร็จ',ค่า:rows.length},{รายการ:'ค่าหมอ',ค่า:rows.reduce((s,x)=>s+Number(x.therapist_pay||0),0)}];const add=(name,data)=>XLSX.utils.book_append_sheet(w,XLSX.utils.json_to_sheet(data.length?data:[{ข้อมูล:'ไม่มีรายการ'}]),name);add('Summary',summary);add('Transactions',rows);const ts={};rows.forEach(x=>{let k=x.therapist_name;ts[k]??={therapist:k,jobs:0,revenue:0,pay:0};ts[k].jobs++;ts[k].revenue+=Number(x.final_price||0);ts[k].pay+=Number(x.therapist_pay||0)});add('Therapist Summary',Object.values(ts));const ss={};rows.forEach(x=>{ss[x.service]??={service:x.service,jobs:0,revenue:0};ss[x.service].jobs++;ss[x.service].revenue+=Number(x.final_price||0)});add('Service Summary',Object.values(ss));const ds={};rows.forEach(x=>{let d=(x.paid_at||'').slice(0,10);ds[d]??={date:d,jobs:0,revenue:0};ds[d].jobs++;ds[d].revenue+=Number(x.final_price||0)});add('Daily Sales',Object.values(ds));add('Discount Summary',rows.filter(x=>Number(x.discount_amount)>0).map(x=>({date:x.paid_at,therapist:x.therapist_name,type:x.discount_type,discount:x.discount_amount})));XLSX.writeFile(w,'MANAWA_POS_Report.xlsx')}
